@@ -1,0 +1,62 @@
+image: docker:20.10.16
+
+stages:
+  - build
+  - integration-test
+  - staging-deploy
+
+variables:
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
+  POSTGRES_DB: app_db
+  POSTGRES_USER: admin
+  POSTGRES_PASSWORD: secret
+
+services:
+  - docker:20.10.16-dind
+
+cache:
+  # store python packages so we do not have to download them on every single run
+  key: "global-dependency-cache-v1"
+  paths:
+    - .venv/
+    - ~/.cache/pip
+
+build_binary:
+  stage: build
+  image: python:3.9-slim
+  script:
+    - echo "generating environment secrets"
+    - echo "POSTGRES_DB=app_db" > .env
+    - echo "POSTGRES_USER=admin" >> .env
+    - pyinstaller --onefile app.py
+
+integration_test:
+  stage: integration-test
+  script:
+    - docker-compose -f docker-compose.yml up -d --build
+    - |
+      DB_READY=false
+      echo "waiting for database..."
+      docker-compose logs db | while read line; do
+        if [[ "$line" == *"ready to accept connections"* ]]; then
+          DB_READY=true
+          break
+        fi
+      done
+      if [ "$DB_READY" = false ]; then
+        echo "database timeout"
+        exit 1
+      fi
+    - docker-compose exec web pytest tests/
+
+staging_deploy:
+  stage: staging-deploy
+  image: ubuntu:22.04
+  script:
+    - echo "preparing staging deployment"
+    - chmod +x ./deploy.sh
+    - echo "executing deployment script"
+    - ./deploy.sh
+  environment:
+    name: staging

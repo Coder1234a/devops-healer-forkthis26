@@ -1,0 +1,24 @@
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# environment variables
+.env
+
+# os generated files
+.DS_Store
+Thumbs.db
+
+# testing and tooling
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ignore the compiled binary in the sandbox
+sandbox/dist/
+sandbox/build/
+*.spec
